@@ -18,3 +18,8 @@ log
 *.jpg
 *.json
 data/outcome
+
+.ipynb_checkpoints/
+
+*.pth
+*.pt

@@ -10,7 +10,8 @@ import itertools
 import struct  # get_image_size
 import imghdr  # get_image_size
 
-from tool import utils 
+from tool import utils
+from typing import List
 
 
 def bbox_ious(boxes1, boxes2, x1y1x2y2=True):
@@ -45,12 +46,12 @@ def bbox_ious(boxes1, boxes2, x1y1x2y2=True):
     return carea / uarea
 
 
-def get_region_boxes(boxes_and_confs):
+def get_region_boxes(boxes_and_confs: List[List[torch.Tensor]]):
 
     # print('Getting boxes from boxes and confs ...')
 
-    boxes_list = []
-    confs_list = []
+    boxes_list:List[torch.Tensor] = []
+    confs_list:List[torch.Tensor] = []
 
     for item in boxes_and_confs:
         boxes_list.append(item[0])

@@ -1,9 +1,11 @@
+from typing import Tuple
 import torch.nn as nn
 import torch.nn.functional as F
 from tool.torch_utils import *
+from typing import Tuple
 
-def yolo_forward(output, conf_thresh, num_classes, anchors, num_anchors, scale_x_y, only_objectness=1,
-                              validation=False):
+def yolo_forward(output, conf_thresh:float, num_classes:int, anchors:List[float], num_anchors:int, scale_x_y:int, 
+                              validation:bool=False):
     # Output would be invalid if it does not satisfy this assert
     # assert (output.size(1) == (5 + num_classes) * num_anchors)
 
@@ -56,13 +58,13 @@ def yolo_forward(output, conf_thresh, num_classes, anchors, num_anchors, scale_x
     cls_confs = torch.sigmoid(cls_confs)
 
     # Prepare C-x, C-y, P-w, P-h (None of them are torch related)
-    grid_x = np.expand_dims(np.expand_dims(np.expand_dims(np.linspace(0, W - 1, W), axis=0).repeat(H, 0), axis=0), axis=0)
-    grid_y = np.expand_dims(np.expand_dims(np.expand_dims(np.linspace(0, H - 1, H), axis=1).repeat(W, 1), axis=0), axis=0)
-    # grid_x = torch.linspace(0, W - 1, W).reshape(1, 1, 1, W).repeat(1, 1, H, 1)
-    # grid_y = torch.linspace(0, H - 1, H).reshape(1, 1, H, 1).repeat(1, 1, 1, W)
+    # grid_x = np.expand_dims(np.expand_dims(np.expand_dims(np.linspace(0, W - 1, W), axis=0).repeat(H, 0), axis=0), axis=0)
+    # grid_y = np.expand_dims(np.expand_dims(np.expand_dims(np.linspace(0, H - 1, H), axis=1).repeat(W, 1), axis=0), axis=0)
+    grid_x = torch.linspace(0, W - 1, W).reshape(1, 1, 1, W).repeat(1, 1, H, 1)
+    grid_y = torch.linspace(0, H - 1, H).reshape(1, 1, H, 1).repeat(1, 1, 1, W)
 
-    anchor_w = []
-    anchor_h = []
+    anchor_w:List[int] = []
+    anchor_h:List[int] = []
     for i in range(num_anchors):
         anchor_w.append(anchors[i * 2])
         anchor_h.append(anchors[i * 2 + 1])
@@ -145,8 +147,8 @@ def yolo_forward(output, conf_thresh, num_classes, anchors, num_anchors, scale_x
     return  boxes, confs
 
 
-def yolo_forward_dynamic(output, conf_thresh, num_classes, anchors, num_anchors, scale_x_y, only_objectness=1,
-                              validation=False):
+def yolo_forward_dynamic(output:torch.Tensor, conf_thresh:float, num_classes:int, anchors:List[float], num_anchors:int, scale_x_y:int, 
+                              validation:bool=False):
     # Output would be invalid if it does not satisfy this assert
     # assert (output.size(1) == (5 + num_classes) * num_anchors)
 
@@ -157,8 +159,8 @@ def yolo_forward_dynamic(output, conf_thresh, num_classes, anchors, num_anchors,
     # And then into
     # bxy = [ 6 ] bwh = [ 6 ] det_conf = [ 3 ] cls_conf = [ num_classes * 3 ]
     # batch = output.size(0)
-    # H = output.size(2)
-    # W = output.size(3)
+    H = output.size(2)
+    W = output.size(3)
 
     bxy_list = []
     bwh_list = []
@@ -199,21 +201,21 @@ def yolo_forward_dynamic(output, conf_thresh, num_classes, anchors, num_anchors,
     cls_confs = torch.sigmoid(cls_confs)
 
     # Prepare C-x, C-y, P-w, P-h (None of them are torch related)
-    grid_x = np.expand_dims(np.expand_dims(np.expand_dims(np.linspace(0, output.size(3) - 1, output.size(3)), axis=0).repeat(output.size(2), 0), axis=0), axis=0)
-    grid_y = np.expand_dims(np.expand_dims(np.expand_dims(np.linspace(0, output.size(2) - 1, output.size(2)), axis=1).repeat(output.size(3), 1), axis=0), axis=0)
-    # grid_x = torch.linspace(0, W - 1, W).reshape(1, 1, 1, W).repeat(1, 1, H, 1)
-    # grid_y = torch.linspace(0, H - 1, H).reshape(1, 1, H, 1).repeat(1, 1, 1, W)
+    # grid_x = np.expand_dims(np.expand_dims(np.expand_dims(np.linspace(0, output.size(3) - 1, output.size(3)), axis=0).repeat(output.size(2), 0), axis=0), axis=0)
+    # grid_y = np.expand_dims(np.expand_dims(np.expand_dims(np.linspace(0, output.size(2) - 1, output.size(2)), axis=1).repeat(output.size(3), 1), axis=0), axis=0)
+    grid_x = torch.linspace(0, W - 1, W).reshape(1, 1, 1, W).repeat(1, 1, H, 1)
+    grid_y = torch.linspace(0, H - 1, H).reshape(1, 1, H, 1).repeat(1, 1, 1, W)
 
-    anchor_w = []
-    anchor_h = []
+    anchor_w:List[float] = []
+    anchor_h:List[float] = []
     for i in range(num_anchors):
         anchor_w.append(anchors[i * 2])
         anchor_h.append(anchors[i * 2 + 1])
 
-    device = None
-    cuda_check = output.is_cuda
-    if cuda_check:
-        device = output.get_device()
+    # device:int = 0
+    # cuda_check = output.is_cuda
+    # if cuda_check:
+    #     device = output.get_device()
 
     bx_list = []
     by_list = []
@@ -224,9 +226,9 @@ def yolo_forward_dynamic(output, conf_thresh, num_classes, anchors, num_anchors,
     for i in range(num_anchors):
         ii = i * 2
         # Shape: [batch, 1, H, W]
-        bx = bxy[:, ii : ii + 1] + torch.tensor(grid_x, device=device, dtype=torch.float32) # grid_x.to(device=device, dtype=torch.float32)
+        bx = bxy[:, ii : ii + 1] +  grid_x.to( dtype=torch.float32)
         # Shape: [batch, 1, H, W]
-        by = bxy[:, ii + 1 : ii + 2] + torch.tensor(grid_y, device=device, dtype=torch.float32) # grid_y.to(device=device, dtype=torch.float32)
+        by = bxy[:, ii + 1 : ii + 2] +  grid_y.to(dtype=torch.float32)
         # Shape: [batch, 1, H, W]
         bw = bwh[:, ii : ii + 1] * anchor_w[i]
         # Shape: [batch, 1, H, W]
@@ -285,14 +287,14 @@ def yolo_forward_dynamic(output, conf_thresh, num_classes, anchors, num_anchors,
     # boxes: [batch, num_anchors * H * W, 1, 4]
     # confs: [batch, num_anchors * H * W, num_classes]
 
-    return  boxes, confs
+    return [boxes, confs]
 
 class YoloLayer(nn.Module):
     ''' Yolo layer
     model_out: while inference,is post-processing inside or outside the model
         true:outside
     '''
-    def __init__(self, anchor_mask=[], num_classes=0, anchors=[], num_anchors=1, stride=32, model_out=False):
+    def __init__(self, anchor_mask:List[int]=[], num_classes:int=0, anchors:List[int]=[], num_anchors:int=1, stride:int=32, model_out:bool=False):
         super(YoloLayer, self).__init__()
         self.anchor_mask = anchor_mask
         self.num_classes = num_classes
@@ -310,10 +312,11 @@ class YoloLayer(nn.Module):
 
         self.model_out = model_out
 
-    def forward(self, output, target=None):
+    def forward(self, output: torch.Tensor):
+        # return output
         if self.training:
-            return output
-        masked_anchors = []
+            return [output, torch.zeros(1)]
+        masked_anchors:List[int] = [] 
         for m in self.anchor_mask:
             masked_anchors += self.anchors[m * self.anchor_step:(m + 1) * self.anchor_step]
         masked_anchors = [anchor / self.stride for anchor in masked_anchors]

@@ -233,7 +233,10 @@ class Yolo_loss(nn.Module):
         return obj_mask, tgt_mask, tgt_scale, target
 
     def forward(self, xin, labels=None):
-        loss, loss_xy, loss_wh, loss_obj, loss_cls, loss_l2 = 0, 0, 0, 0, 0, 0
+        loss = torch.zeros(1)
+        loss_xy= torch.zeros(1)
+        loss_wh:torch.Tensor = torch.zeros(1)
+        loss_obj, loss_cls, loss_l2 = torch.zeros(1), torch.zeros(1), torch.zeros(1)
         for output_id, output in enumerate(xin):
             batchsize = output.shape[0]
             fsize = output.shape[2]
@@ -261,10 +264,10 @@ class Yolo_loss(nn.Module):
             target[..., 4] *= obj_mask
             target[..., np.r_[0:4, 5:n_ch]] *= tgt_mask
             target[..., 2:4] *= tgt_scale
-
+            loss_wh:torch.Tensor = loss_wh + F.mse_loss(input=output[..., 2:4], target=target[..., 2:4], reduction='sum') / 2
             loss_xy += F.binary_cross_entropy(input=output[..., :2], target=target[..., :2],
                                               weight=tgt_scale * tgt_scale, reduction='sum')
-            loss_wh += F.mse_loss(input=output[..., 2:4], target=target[..., 2:4], reduction='sum') / 2
+            
             loss_obj += F.binary_cross_entropy(input=output[..., 4], target=target[..., 4], reduction='sum')
             loss_cls += F.binary_cross_entropy(input=output[..., 5:], target=target[..., 5:], reduction='sum')
             loss_l2 += F.mse_loss(input=output, target=target, reduction='sum')
@@ -415,7 +418,7 @@ def train(model, device, config, epochs=5, batch_size=1, save_cp=True, log_step=
             if cfg.use_darknet_cfg:
                 eval_model = Darknet(cfg.cfgfile, inference=True)
             else:
-                eval_model = Yolov4(cfg.pretrained, n_classes=cfg.classes, inference=True)
+                eval_model = Yolov4(cfg.pretrained, n_classes=cfg.classes)
             # eval_model = Yolov4(yolov4conv137weight=None, n_classes=config.classes, inference=True)
             if torch.cuda.device_count() > 1:
                 eval_model.load_state_dict(model.module.state_dict())

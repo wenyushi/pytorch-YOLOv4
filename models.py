@@ -3,6 +3,7 @@ from torch import nn
 import torch.nn.functional as F
 from tool.torch_utils import *
 from tool.yolo_layer import YoloLayer
+from typing import List
 
 
 class Mish(torch.nn.Module):
@@ -18,11 +19,11 @@ class Upsample(nn.Module):
     def __init__(self):
         super(Upsample, self).__init__()
 
-    def forward(self, x, target_size, inference=False):
+    def forward(self, x, target_size: List[int]):
         assert (x.data.dim() == 4)
         # _, _, tH, tW = target_size
 
-        if inference:
+        if not self.training:
 
             #B = x.data.size(0)
             #C = x.data.size(1)
@@ -237,9 +238,8 @@ class DownSample5(nn.Module):
 
 
 class Neck(nn.Module):
-    def __init__(self, inference=False):
+    def __init__(self):
         super().__init__()
-        self.inference = inference
 
         self.conv1 = Conv_Bn_Activation(1024, 512, 1, 1, 'leaky')
         self.conv2 = Conv_Bn_Activation(512, 1024, 3, 1, 'leaky')
@@ -277,7 +277,7 @@ class Neck(nn.Module):
         self.conv19 = Conv_Bn_Activation(128, 256, 3, 1, 'leaky')
         self.conv20 = Conv_Bn_Activation(256, 128, 1, 1, 'leaky')
 
-    def forward(self, input, downsample4, downsample3, inference=False):
+    def forward(self, input, downsample4: torch.Tensor, downsample3: torch.Tensor):
         x1 = self.conv1(input)
         x2 = self.conv2(x1)
         x3 = self.conv3(x2)
@@ -292,7 +292,7 @@ class Neck(nn.Module):
         x6 = self.conv6(x5)
         x7 = self.conv7(x6)
         # UP
-        up = self.upsample1(x7, downsample4.size(), self.inference)
+        up = self.upsample1(x7, list(downsample4.size()))
         # R 85
         x8 = self.conv8(downsample4)
         # R -1 -3
@@ -306,7 +306,7 @@ class Neck(nn.Module):
         x14 = self.conv14(x13)
 
         # UP
-        up = self.upsample2(x14, downsample3.size(), self.inference)
+        up = self.upsample2(x14, list(downsample3.size()))
         # R 54
         x15 = self.conv15(downsample3)
         # R -1 -3
@@ -321,9 +321,8 @@ class Neck(nn.Module):
 
 
 class Yolov4Head(nn.Module):
-    def __init__(self, output_ch, n_classes, inference=False):
+    def __init__(self, output_ch, n_classes):
         super().__init__()
-        self.inference = inference
 
         self.conv1 = Conv_Bn_Activation(128, 256, 3, 1, 'leaky')
         self.conv2 = Conv_Bn_Activation(256, output_ch, 1, 1, 'linear', bn=False, bias=True)
@@ -395,7 +394,7 @@ class Yolov4Head(nn.Module):
         x17 = self.conv17(x16)
         x18 = self.conv18(x17)
         
-        if self.inference:
+        if not self.training:
             y1 = self.yolo1(x2)
             y2 = self.yolo2(x10)
             y3 = self.yolo3(x18)
@@ -407,7 +406,7 @@ class Yolov4Head(nn.Module):
 
 
 class Yolov4(nn.Module):
-    def __init__(self, yolov4conv137weight=None, n_classes=80, inference=False):
+    def __init__(self, yolov4conv137weight=None, n_classes=80):
         super().__init__()
 
         output_ch = (4 + 1 + n_classes) * 3
@@ -419,7 +418,7 @@ class Yolov4(nn.Module):
         self.down4 = DownSample4()
         self.down5 = DownSample5()
         # neck
-        self.neek = Neck(inference)
+        self.neek = Neck()
         # yolov4conv137
         if yolov4conv137weight:
             _model = nn.Sequential(self.down1, self.down2, self.down3, self.down4, self.down5, self.neek)
@@ -433,7 +432,7 @@ class Yolov4(nn.Module):
             _model.load_state_dict(model_dict)
         
         # head
-        self.head = Yolov4Head(output_ch, n_classes, inference)
+        self.head = Yolov4Head(output_ch, n_classes)
 
 
     def forward(self, input):
@@ -471,7 +470,7 @@ if __name__ == "__main__":
         print('Usage: ')
         print('  python models.py num_classes weightfile imgfile namefile')
 
-    model = Yolov4(yolov4conv137weight=None, n_classes=n_classes, inference=True)
+    model = Yolov4(yolov4conv137weight=None, n_classes=n_classes)
 
     pretrained_dict = torch.load(weightfile, map_location=torch.device('cuda'))
     model.load_state_dict(pretrained_dict)

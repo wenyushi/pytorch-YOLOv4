@@ -26,6 +26,7 @@ A minimal PyTorch implementation of YOLOv4.
 ├── cfg                   cfg --> darknet2pytorch
 ├── data            
 ├── weight                --> darknet2pytorch
+├── torchscript.ipynb
 ├── tool
 │   ├── camera.py           a demo camera
 │   ├── coco_annotation.py       coco dataset generator
@@ -37,6 +38,18 @@ A minimal PyTorch implementation of YOLOv4.
 ```
 
 ![image](https://user-gold-cdn.xitu.io/2020/4/26/171b5a6c8b3bd513?w=768&h=576&f=jpeg&s=78882)
+
+# TorchScript
+Run `torchscript.ipynb` to generate torchscript model. Basically, there are two Torchscript models in script format.
+1. `scripted_yolo_v4.pt`: model architecture along with weights
+2. `scripted_loss_function.pt`: used for computing yolo loss given the outputs of `scripted_yolo_v4.pt` and labels
+
+`scripted_yolo_v4.pt` can be used for `train` and `eval`. In train mode, the model will result in three feature maps which encode bounding box locations and class confidences, and in turn, act as inputs of `scripted_loss_function.pt`; in eval mode, the model will result in two Tensors which aggregate all bounding boxes and class confidences for post-processing.
+`scripted_loss_function.pt` is intended for training only.
+
+The original implementation of `torch.nn.module::Yolov4` and `torch.nn.module::Yolo_loss` contains dynamic statements, such as `if` and lacking of explicit type, thus we must translate the module in script format. To learn how to rewrite and annotate them, please check out `torchscript.ipynb`, `model.py`, `yolo_layer.py`, etc.
+
+Please note that `scripted_loss_function.pt` only works with cuda. I have no idea the reason so far.
 
 # 0. Weights Download
 
